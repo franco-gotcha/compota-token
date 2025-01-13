@@ -29,12 +29,13 @@ The system also introduces key features such as **configurable interest rate bou
    - [Custom Errors & Event Emissions](#custom-errors--event-emissions)  
 6. [Why Uniswap V2?](#why-uniswap-v2)  
 7. [Ownership & Access Control](#ownership--access-control)  
-8. [Overridden ERC20 Methods](#overridden-erc20-methods) 
-9. [API Reference & Methods](#api-reference--methods)  
+8. [Overridden ERC20 Methods](#overridden-erc20-methods)
+9. [Virtual Functions](#virtual-functions) 
+10. [API Reference & Methods](#api-reference--methods)  
    - [ICompota Interface](#icompota-interface)  
    - [Additional Public/External Functions](#additional-publicexternal-functions)   
-10. [Security & Audit Considerations](#security--audit-considerations)  
-11. [License](#license)
+11. [Security & Audit Considerations](#security--audit-considerations)  
+12. [License](#license)
 
 ---
 
@@ -71,7 +72,7 @@ It interfaces with:
 
 - **`AccountBalance`**: Tracks base holdings for each user.  
 - **`UserStake`**: Tracks staked LP and relevant timestamps.  
-- **`StakingPool`**: Parameters for each pool, including `lpToken`, `multiplierMax`, `timeThreshold`.
+- **`StakingPool`**: Parameters for each pool, including `lpToken`, `multiplierMax`, `timeThreshold`, `active`.
 
 ---
 
@@ -145,6 +146,7 @@ This yields a **time-weighted average** of how much the user held or staked.
 - The contract holds an array of `StakingPool`.
 - Each pool has its own LP token, `multiplierMax`, and `timeThreshold`.
 - Users can stake/unstake by specifying `poolId`.
+- Each `StakingPool` includes a boolean `active` field, indicating whether the pool is enabled for new stakes. The function, `disableStakingPool(poolId_)`, allows the owner to deactivate a pool, preventing additional staking while preserving any existing stakes in that pool.
 
 ### Min/Max Yearly Rate
 - `MIN_YEARLY_RATE` and `MAX_YEARLY_RATE` define the allowable range.
@@ -153,6 +155,7 @@ This yields a **time-weighted average** of how much the user held or staked.
 ### Reward Cooldown
 - A global `rewardCooldownPeriod` ensures a user cannot claim rewards too often, preventing **over-compounding**.
 - If a user attempts to claim before cooldown finishes, only their internal accounting is updated.
+- The function `isClaimable(address account_)` returns a single `uint32 timeLeft`. If `timeLeft == 0`, the user’s rewards are fully claimable; otherwise, the user must wait `timeLeft` more seconds before claiming again.
 
 ### Max Total Supply Constraint
 - Any token mint or reward mint cannot exceed `maxTotalSupply`.
@@ -237,6 +240,20 @@ These overrides ensure that **reward logic and supply constraints** are seamless
 
 ---
 
+## Virtual Functions
+
+The following methods in **Compota** are declared `virtual`, enabling child contracts to override them and adapt specific behaviors if needed:
+
+- `balanceOf(address account_)`
+- `_mint(address to_, uint256 amount_)`
+- `_burn(address from_, uint256 amount_)`
+- `_updateRewardsWithoutCooldown(address accountAddress_, uint32 timestamp_)`
+- `_updateRewards(address account_)`
+
+These are defined as `virtual`, allowing extension or customization of the reward, minting, burning, and balance logic without modifying the base contract.
+
+---
+
 ## API Reference & Methods
 
 ### ICompota Interface
@@ -278,8 +295,11 @@ Helper function for base reward math.
  Mints pending rewards if cooldown is met; otherwise updates state.
 
 ### Additional Public/External Functions
-- **`calculateCubicMultiplier(uint256 multiplierMax_, uint256 timeThreshold_, uint256 timeStaked_) returns (uint256)`**  
-Public helper to view the multiplier growth.
+- **`calculateCubicMultiplier(uint256 multiplierMax_, uint256 timeThreshold_, uint256 timeStaked_) returns (uint256)`**: Public helper to view the multiplier growth.
+- **`getUserBaseRewards(address account_)`**: Returns the user’s current unclaimed base rewards (in the smallest token unit.  
+- **`getUserStakingRewards(address account_)`**: Returns the user’s current unclaimed staking rewards.  
+- **`getUserTotalRewards(address account_)`**: Returns the user's sum of base and staking rewards.  
+- **`getGlobalRewards()`**: Aggregates the unclaimed base and staking rewards across all users.
 
 ---
 
